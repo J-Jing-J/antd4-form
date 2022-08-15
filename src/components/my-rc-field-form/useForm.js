@@ -67,7 +67,19 @@ class FormStore {
     validate = () => {
         let err = []
         // 做校验
+        this.fieldEntities.forEach(entity => {
+            // 拿到Field组件上的 name 和 rules
+            const {name, rules} = entity.props
 
+            // 取出值和校验规则
+            const value = this.getFieldValue(name)
+            let rule = rules[0]
+
+            if(rule && rule.required && (value === undefined || value === '')) {
+                // 若校验失败，显示错误信息
+                err.push({[name]: rules.message, value})
+            }
+        })
         // 返回错误信息
         return err
     }
@@ -98,15 +110,23 @@ class FormStore {
     }
 }
 
-export default function useForm () {
+export default function useForm (form) {
     // 用FormStore： 在ref/中new(useRef) --- ref是将值存在hooks链表上，组件的生命周期内一直是同一个
     // 等于存在Fiber上了
     const formRef = useRef()
     // 组件更新时保证指向自己
+
+    // 看外面有没有传进form
     if(!formRef.current) {
-        const formStore = new FormStore()
-        // 调用getForm只返回暴露出来的那部分
-        formRef.current = formStore.getForm()
+        if(form) {
+            // 若外面传了，就使用传的form
+            formRef.current = form
+        } else {
+            // 若外面没传，就新建Store
+            const formStore = new FormStore()
+            // 调用getForm只返回暴露出来的那部分
+            formRef.current = formStore.getForm()
+        }
     }
     
     return [formRef.current]
