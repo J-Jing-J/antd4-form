@@ -11,7 +11,30 @@ class FormStore {
     constructor() {
         // 用Field组件的name区分状态
         this.store = {}
+        // 订阅：数组里存Field组件实例，拿到实例就能拿到onStoreChange，从而调用forceUpdate
+        this.fieldEntities = []
+        // 存Form组件传下来的 onFinish, onFinishFailed
+        this.callbacks = []
     }
+
+    setCallbacks = (callbacks) => {
+        this.callbacks = [...this.callbacks, ...callbacks]
+    }
+
+    // 注册实例
+    // 注册与取消注册/订阅与取消订阅，都要成对出现
+    // Field订阅store，store变了 Field组件的状态值就在 setFieldValue 中更新
+    registerFieldEntities = (entity) => {
+        this.fieldEntities.push(entity)
+
+        return () => {
+            // 取消注册，闭包，保留了注册时的实例，找到那个实例从数组中删除就行了
+            this.fieldEntities = this.fieldEntities.filter(item => item !== entity)
+            // 状态从store中删除
+            delete this.store(entity.props.name)
+        }
+    }
+
     // get
     getFieldsValue() {
         // 解构，安全，防止外面修改
@@ -22,10 +45,43 @@ class FormStore {
     }
 
     // set
+    // newStore的格式是[{name: value}, {name: value}, ...]
     setFieldValue(newStore) {
+        // 更新 store
         this.store = {
             ...this.store,
             ...newStore
+        }
+        // 更新 订阅的Field组件
+        this.fieldEntities.forEach((entity) => {
+            // 筛选出需要更新的组件
+            Object.keys(newStore).forEach(k => {
+                if(k === entity.props.name) {
+                    entity.onStoreChange()
+                }
+            })
+        })
+    }
+
+    // 校验表单项
+    validate = () => {
+        let err = []
+        // 做校验
+
+        // 返回错误信息
+        return err
+    }
+
+    // 提交表单 store里面同时有校验规则和状态值
+    submit = () => {
+        let err = this.validate()
+        const {onFinish, onFinishFailed} = this.callbacks
+        if(err.lenght === 0) {
+            // 校验通过, 返回状态值
+            onFinish(this.getFieldsValue())
+        } else {
+            // 校验未通过
+            onFinishFailed(err, this.getFieldsValue())
         }
     }
 
@@ -35,6 +91,9 @@ class FormStore {
             getFieldValue: this.getFieldValue,
             getFieldsValue: this.getFieldsValue,
             setFieldValue: this.setFieldValue,
+            registerFieldEntities: this.registerFieldEntities,
+            submit: this.submit,
+            setCallbacks: this.setCallbacks
         }
     }
 }
@@ -50,5 +109,5 @@ export default function useForm () {
         formRef.current = formStore.getForm()
     }
     
-    return []
+    return [formRef.current]
 }
